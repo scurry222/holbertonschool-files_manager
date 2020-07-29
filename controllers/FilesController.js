@@ -5,7 +5,7 @@ import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 import writeFile from '../utils/write';
 
-export default async (req, res) => {
+export const postUpload = async (req, res) => {
   const token = req.header('X-Token');
   const userId = await redisClient.get(`auth_${token}`);
 
@@ -59,4 +59,32 @@ export default async (req, res) => {
   delete fileData.data;
 
   return res.json(fileData);
+};
+
+export const getShow = async (req, res) => {
+  const { id } = req.params;
+  const token = req.header('X-Token');
+
+  const user = await redisClient.get(`auth_${token}`);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  console.log(user, id);
+  const file = await dbClient.findFile({ user, _id: ObjectID(id) });
+  if (!file) return res.status(404).json({ error: 'Not found' });
+
+  file.id = file._id;
+  delete file._id;
+  delete file.data;
+  delete file.path;
+
+  return res.json(file);
+};
+
+export const getIndex = async (req, res) => {
+  const token = req.header('X-Token');
+  const user = await redisClient.get(`auth_${token}`);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  const { parentId, page } = req.query;
+
+  const paginate = await dbClient.aggregateFiles(user, parentId, page);
+  return res.json(paginate);
 };

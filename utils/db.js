@@ -43,6 +43,30 @@ class DBClient {
     const newFile = await this.db.collection('files').findOne(data);
     return newFile;
   }
+
+  async findFile(data) {
+    return this.db.collection('files').findOne(data);
+  }
+
+  async aggregateFiles(userId, parentId, page = 1) {
+    const user = { userId };
+    if (parentId && parentId !== undefined) user.parentId = parentId;
+
+    const cursor = await this.db.collection('files').aggregate([
+      { $match: user },
+      { $skip: (page - 1) * 20 },
+      { $limit: 20 },
+    ]).toArray();
+    const files = [];
+    cursor.forEach(({
+      _id, userId, name, type, isPublic, parentId,
+    }) => {
+      files.push({
+        id: _id, userId, name, type, isPublic, parentId,
+      });
+    });
+    return files;
+  }
 }
 
 const dbClient = new DBClient();
