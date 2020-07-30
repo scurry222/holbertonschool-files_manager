@@ -39,9 +39,7 @@ class DBClient {
 
   async uploadFile(data) {
     await this.db.collection('files').insertOne(data);
-
-    const newFile = await this.db.collection('files').findOne(data);
-    return newFile;
+    return this.db.collection('files').findOne(data);
   }
 
   async findFile(data) {
@@ -66,6 +64,11 @@ class DBClient {
       });
     });
     return files;
+  }
+
+  async updateFile(data, change) {
+    await this.db.collection('files').updateOne(data, { $set: change });
+    return this.db.collection('files').findOne(data);
   }
 }
 
