@@ -1,8 +1,10 @@
 import { ObjectID } from 'mongodb';
 import { v4 as uuid } from 'uuid';
+import mime from 'mime-types';
 
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
+import readFile from '../utils/read';
 import writeFile from '../utils/write';
 
 export const postUpload = async (req, res) => {
@@ -115,4 +117,25 @@ export const putUnPublish = async (req, res) => {
   file = await dbClient.updateFile({ _id: ObjectID(id) }, { isPublic: false });
 
   return res.json(file);
+};
+
+export const getFile = async (req, res) => {
+  const { id } = req.params;
+
+  const file = await dbClient.findFile({ _id: ObjectID(id) });
+  if (!file) return res.status(404).json({ error: 'Not found' });
+  if (file.isPublic === false) {
+    const token = req.header('X-Token');
+    const user = await redisClient.get(`auth_${token}`);
+    if (user !== file.userId) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+  }
+  if (file.type === 'folder') {
+    return res.status(400).json({ error: 'A folder doesn\'t have content' });
+  }
+  const data = await readFile(file.path);
+
+  res.set('Content-Type', mime.contentType(file.name));
+  return res.json(data);
 };

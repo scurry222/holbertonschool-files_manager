@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-export default (name, data) => {
+export default async (name, data) => {
   const path = '/tmp/files_manager/';
   const clear = Buffer.from(data, 'base64').toString('utf8');
   fs.promises.mkdir(path, { recursive: true }).catch((err) => { throw err; });
