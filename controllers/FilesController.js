@@ -48,7 +48,7 @@ export const postUpload = async (req, res) => {
 
   if (type !== 'folder') {
     fileData.data = data;
-    fileData.path = await writeFile(uuid(), type, data);
+    fileData.path = await writeFile(uuid(), data, type);
   }
 
   const newFile = await dbClient.uploadFile(fileData);
@@ -121,7 +121,6 @@ export const putUnPublish = async (req, res) => {
 
 export const getFile = async (req, res) => {
   const { id } = req.params;
-  const { size } = req.query;
 
   const file = await dbClient.findFile({ _id: ObjectID(id) });
   if (!file) return res.status(404).json({ error: 'Not found' });
@@ -143,17 +142,14 @@ export const getFile = async (req, res) => {
     return res.status(400).json({ error: 'A folder doesn\'t have content' });
   }
 
-  if (size && size !== undefined) path = `${path}_${size}`;
+  const { size } = req.query;
 
+  if (size && size !== undefined) path = `${path}_${size}`;
   res.set('Content-Type', mime.contentType(name));
-  if (type === 'image') {
-    console.log('we in here');
-    return res.sendFile(path);
-  }
+
+  if (type === 'image') return res.sendFile(path);
 
   const data = await readFile(path, type);
-
-  console.log('we made it here');
 
   return res.send(data);
 };

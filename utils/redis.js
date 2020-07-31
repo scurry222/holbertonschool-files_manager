@@ -8,10 +8,7 @@ class RedisClient {
   }
 
   isAlive() {
-    try {
-      this.client.ping();
-      return true;
-    } catch (err) { return false; }
+    return this.client.connected;
   }
 
   async get(key) {
