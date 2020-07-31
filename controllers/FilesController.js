@@ -6,6 +6,7 @@ import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 import readFile from '../utils/read';
 import writeFile from '../utils/write';
+import fileQueue from '../worker';
 
 export const postUpload = async (req, res) => {
   const token = req.header('X-Token');
@@ -45,22 +46,21 @@ export const postUpload = async (req, res) => {
     isPublic,
   };
 
-  if (type === 'folder') {
-    const newFile = await dbClient.uploadFile(fileData);
-    newFile.id = newFile._id;
-    delete newFile._id;
-
-    return res.json(newFile);
+  if (type !== 'folder') {
+    fileData.data = data;
+    fileData.path = await writeFile(uuid(), type, data);
   }
 
-  fileData.id = userId;
-  fileData.data = data;
-  fileData.path = writeFile(uuid(), data);
+  const newFile = await dbClient.uploadFile(fileData);
 
-  delete fileData.path;
-  delete fileData.data;
+  if (type === 'image') await fileQueue.add(newFile);
 
-  return res.json(fileData);
+  newFile.id = newFile._id;
+  delete newFile._id;
+  delete newFile.data;
+  delete newFile.path;
+
+  return res.json(newFile);
 };
 
 export const getShow = async (req, res) => {
@@ -121,21 +121,39 @@ export const putUnPublish = async (req, res) => {
 
 export const getFile = async (req, res) => {
   const { id } = req.params;
+  const { size } = req.query;
 
   const file = await dbClient.findFile({ _id: ObjectID(id) });
   if (!file) return res.status(404).json({ error: 'Not found' });
-  if (file.isPublic === false) {
+
+  const {
+    isPublic, type, name, userId,
+  } = file;
+  let { path } = file;
+
+  if (isPublic === false) {
     const token = req.header('X-Token');
     const user = await redisClient.get(`auth_${token}`);
-    if (user !== file.userId) {
+    if (user !== userId) {
       return res.status(404).json({ error: 'Not found' });
     }
   }
-  if (file.type === 'folder') {
+
+  if (type === 'folder') {
     return res.status(400).json({ error: 'A folder doesn\'t have content' });
   }
-  const data = await readFile(file.path);
 
-  res.set('Content-Type', mime.contentType(file.name));
-  return res.json(data);
+  if (size && size !== undefined) path = `${path}_${size}`;
+
+  res.set('Content-Type', mime.contentType(name));
+  if (type === 'image') {
+    console.log('we in here');
+    return res.sendFile(path);
+  }
+
+  const data = await readFile(path, type);
+
+  console.log('we made it here');
+
+  return res.send(data);
 };
